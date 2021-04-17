@@ -16,5 +16,8 @@ import com.tts.usersapi.models.User;
         @Override
         public List<User> findAll();
         //if you do this spring will guarantee it returns a list. try to avoid cast whenever possible.
+        
+        public List<User> findByFirstNameAndLastName(String firstName, String lastName);
     }
+    
 

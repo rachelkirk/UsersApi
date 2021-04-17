@@ -3,9 +3,12 @@ package com.tts.usersapi.controllers;
 import java.util.List;
 import java.util.Optional;
 
+import javax.validation.Valid;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,64 +42,86 @@ public class UserControllerV2  //put a copy of this file in ECommerceDUMMY proje
     @ApiOperation(value = "Get all users, filtered by state", response = User.class, responseContainer = "List")
     @ApiResponses(value = {
             @ApiResponse(code = 200, message = "Successfully retrieved users"),
-            @ApiResponse(code = 400, message = "Bad request, state parameter not provided")
-        })
+            @ApiResponse(code = 400, message = "Bad request, state parameter missing")
+    })
     @GetMapping("/users")
-    public ResponseEntity<List<User>> getUsers(@RequestParam(value = "state", required = true) String state)
+    public ResponseEntity<List<User>> getUsers(@RequestParam(value="state", required=true) String state)
     {
-        if(state != null)
+        List<User> users;
+        if(state == null)
         {
-            repository.findByState(state);
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
-
-        repository.findAll();
-        return new ResponseEntity<List<User>>(HttpStatus.CREATED);
-
+        users = repository.findByState(state);
+        return new ResponseEntity<>(users, HttpStatus.OK);
     }
     
     @ApiOperation(value = "Get a single user", response = User.class)
     @ApiResponses(value = {
             @ApiResponse(code = 200, message = "Successfully retrieved user"),
-            @ApiResponse(code = 404, message = "User wasn't found")
-            })
+            @ApiResponse(code = 404, message = "User not found")
+    })
     @GetMapping("/users/{id}")
-    public Optional<User> getUserById(@PathVariable(value="id")Long id)
+    public ResponseEntity<Optional<User>> getUserById(@PathVariable(value="id") Long id)
     {
-        return repository.findById(id);
+        Optional<User> user = repository.findById(id);
+        if(!user.isPresent()) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+        return new ResponseEntity<>(user, HttpStatus.OK);
     }
-   
+    
     @ApiOperation(value = "Create a user", response = Void.class)
-    //in postman, use raw and JSON. building request to endpoint Postman. passing in user information
     @ApiResponses(value = {
-            @ApiResponse(code = 200, message = "Successfully created user"),
-            @ApiResponse(code = 400, message = "Bad request formatting or user already exisits")
-            })
+            @ApiResponse(code = 201, message = "Successfully created user"),
+            @ApiResponse(code = 400, message = "Bad request formatting or user exists")
+    })
     @PostMapping("/users")
-    public void createUser(@RequestBody User user)
+    public ResponseEntity<Void> createUser(@RequestBody @Valid User user, BindingResult bindingResult)
     {
+        if(repository.findByFirstNameAndLastName(user.getFirstName(), user.getLastName()).size() != 0) {
+            bindingResult.rejectValue("id", "error.id", "User id aleady exists");
+        }
+        if(bindingResult.hasErrors()) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
         repository.save(user);
+        return new ResponseEntity<>(HttpStatus.CREATED);
     }
     
     @ApiOperation(value = "Update a user", response = Void.class)
     @ApiResponses(value = {
-            @ApiResponse(code = 200, message = "Successfully updated user"),
-            @ApiResponse(code = 400, message = "Bad request formmatting"),
+            @ApiResponse(code = 200, message = "User updated successfully"),
+            @ApiResponse(code = 400, message = "Bad request formatting"),
             @ApiResponse(code = 404, message = "User id not found")
-            })
+    })
     @PutMapping("/users/{id}")
-    public void createUser(@PathVariable(value="id")Long id, @RequestBody User user)
+    public ResponseEntity<Void> updateUser(@PathVariable(value="id") Long id, @RequestBody @Valid User user, BindingResult bindingResult)
     {
+        if(repository.findById(user.getId()) == null) {
+            bindingResult.rejectValue("id", "error.id", "User id not found");
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+        if(bindingResult.hasErrors()) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
+        }
         repository.save(user);
+        return new ResponseEntity<>(HttpStatus.OK);
     }
     
     @ApiOperation(value = "Delete a user", response = Void.class)
     @ApiResponses(value = {
-    @ApiResponse(code = 200, message = "Successfully deleted user"),
-    @ApiResponse(code = 404, message = "User id not found")
+            @ApiResponse(code = 200, message = "User deleted successfully"),
+            @ApiResponse(code = 404, message = "User id not found")
     })
     @DeleteMapping("/users/{id}")
-    public void deleteUser(@PathVariable(value="id") Long id)
+    public ResponseEntity<Void> deleteUser(@PathVariable(value="id") Long id, @RequestBody @Valid User user, BindingResult bindingResult)
     {
+        if(repository.findById(user.getId()) == null) {
+            bindingResult.rejectValue("id", "error.id", "User id not found");
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
         repository.deleteById(id);
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 }
